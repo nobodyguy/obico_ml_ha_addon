@@ -1,0 +1,4 @@
+---
+build_from:
+  aarch64: thespaghettidetective/ml_api_base:1.4
+  amd64: thespaghettidetective/ml_api_base:1.4

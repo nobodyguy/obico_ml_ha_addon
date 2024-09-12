@@ -1,0 +1,9 @@
+---
+name: Obico ML Image
+version: dev
+slug: obico-ml
+description: Obico ML REST API server image.
+url: https://github.com/nobodyguy/obico_ml_ha_addon
+arch:
+  - aarch64
+  - amd64
