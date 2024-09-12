@@ -94,8 +94,6 @@ def draw_bounding_boxes(image, detections):
 
 @app.route('/detect/', methods=['GET'])
 def get_detections():
-    app.logger.error("aaaa")
-    print(json.dumps(request.args))
     if 'img' in request.args:
         try:
             resp = requests.get(request.args['img'], stream=True, timeout=(5.0, 5))
@@ -105,7 +103,6 @@ def get_detections():
             
             threshold = float(request.args.get('threshold', THRESH))
             detections = detect(net_main, img, thresh=threshold)
-            app.logger.debug(f"Raw detections: {detections}")
             
             # Draw bounding boxes on the image
             img_with_boxes = draw_bounding_boxes(img, detections)
