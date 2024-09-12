@@ -34,11 +34,11 @@ RUN \
     apt-get update \
     \
     && apt-get install -y --no-install-recommends \
-        ca-certificates=20240203 \
-        curl=8.5.0-2ubuntu10.1 \
-        jq=1.7.1-3build1 \
-        tzdata=2024a-2ubuntu1 \
-        xz-utils=5.6.1+really5.4.5-1 \
+        ca-certificates \
+        curl \
+        jq \
+        tzdata \
+        xz-utils \
     \
     && S6_ARCH="${BUILD_ARCH}" \
     && if [ "${BUILD_ARCH}" = "i386" ]; then S6_ARCH="i686"; \
@@ -99,23 +99,23 @@ ARG BUILD_REPOSITORY
 
 # Labels
 LABEL \
-    io.hass.name="Addon Ubuntu base for ${BUILD_ARCH}" \
-    io.hass.description="Home Assistant Community Add-on: ${BUILD_ARCH} Ubuntu base image" \
+    io.hass.name="Obico ML" \
+    io.hass.description="Home Assistant Community Add-on: Obico ML" \
     io.hass.arch="${BUILD_ARCH}" \
-    io.hass.type="base" \
+    io.hass.type="addon" \
     io.hass.version=${BUILD_VERSION} \
     io.hass.base.version=${BUILD_VERSION} \
-    io.hass.base.name="ubuntu" \
-    io.hass.base.image="hassioaddons/ubuntu-base" \
-    maintainer="Franck Nijhof <frenck@addons.community>" \
-    org.opencontainers.image.title="Addon Ubuntu base for ${BUILD_ARCH}" \
-    org.opencontainers.image.description="Home Assistant Community Add-on: ${BUILD_ARCH} Ubuntu base image" \
-    org.opencontainers.image.vendor="Home Assistant Community Add-ons" \
-    org.opencontainers.image.authors="Franck Nijhof <frenck@addons.community>" \
+    io.hass.base.name="obico-ml" \
+    io.hass.base.image="hassioaddons/obico-ml" \
+    maintainer="Jan Gnip" \
+    org.opencontainers.image.title="Obico ML" \
+    org.opencontainers.image.description="Home Assistant Community Add-on: Obico ML" \
+    org.opencontainers.image.vendor="Jan Gnip" \
+    org.opencontainers.image.authors="Jan Gnip" \
     org.opencontainers.image.licenses="MIT" \
-    org.opencontainers.image.url="https://addons.community" \
-    org.opencontainers.image.source="https://github.com/${BUILD_REPOSITORY}" \
-    org.opencontainers.image.documentation="https://github.com/${BUILD_REPOSITORY}/blob/main/README.md" \
+    org.opencontainers.image.url="https://github.com/nobodyguy/obico_ml_ha_addon" \
+    org.opencontainers.image.source="https://github.com/nobodyguy/obico_ml_ha_addon" \
+    org.opencontainers.image.documentation="https://github.com/nobodyguy/obico_ml_ha_addon/blob/main/README.md" \
     org.opencontainers.image.created=${BUILD_DATE} \
     org.opencontainers.image.revision=${BUILD_REF} \
     org.opencontainers.image.version=${BUILD_VERSION}
