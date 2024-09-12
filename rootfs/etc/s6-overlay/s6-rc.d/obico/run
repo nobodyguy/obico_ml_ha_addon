@@ -1,0 +1,11 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Community Add-on: Obico ML
+# Starts the Obico ML REST API server
+# ==============================================================================
+declare -a options
+
+bashio::log.info 'Starting Obico ML REST API server...'
+
+exec gunicorn --bind 0.0.0.0:3333 --chdir /app --limit-request-line 0 --workers 1 wsgi
