@@ -124,8 +124,12 @@ LABEL \
 ########################### OBICO ML API SPECIFIC PART ###########################
 EXPOSE 3333
 
+# Health check
+HEALTHCHECK \
+    CMD curl --fail http://0.0.0.0:3333/hc || exit 1
+
 WORKDIR /app
-ADD . /app
+ADD ./app /app
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
