@@ -1,6 +1,5 @@
 name: Obico ML Home Assistant Addon
-version: 1.0.0
-version: dev
+version: "1.0.0"
 slug: obico_ml_ha_addon
 description: "Home Assistant addon for integrating Obico ML-based monitoring."
 ports:
@@ -13,6 +12,7 @@ arch:
   - amd64
 startup: services
 boot: auto
+init: false
 healthcheck:
   enabled: true
   interval: 30s

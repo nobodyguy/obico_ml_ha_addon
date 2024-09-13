@@ -24,7 +24,6 @@ jobs:
             --addon \
             --amd64 \
             --aarch64 \
-            --release-tag \
             --target /data \
             --docker-hub ${{ secrets.DOCKERHUB_USERNAME }} \
             --docker-user ${{ secrets.DOCKERHUB_USERNAME }} \
