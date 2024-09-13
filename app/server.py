@@ -13,7 +13,7 @@ import logging
 
 from lib.detection_model import load_net, detect
 
-THRESH = 0.10  # The threshold for a box to be considered a positive detection
+THRESH = 0.2  # The threshold for a box to be considered a positive detection
 NMS_THRESHOLD = 0.8  # Non-max suppression IoU threshold
 SESSION_TTL_SECONDS = 60*2
 
