@@ -10,11 +10,11 @@ import numpy as np
 import requests
 import io
 import logging
+import base64
 
 from lib.detection_model import load_net, detect
 
 THRESH = 0.2  # The threshold for a box to be considered a positive detection
-NMS_THRESHOLD = 0.8  # Non-max suppression IoU threshold
 SESSION_TTL_SECONDS = 60*2
 
 app = flask.Flask(__name__)
@@ -23,7 +23,7 @@ Compress(app)
 status = dict()
 
 # SECURITY WARNING: don't run with debug turned on in production!
-app.config['DEBUG'] = True
+app.config['DEBUG'] = environ.get('DEBUG') == 'True'
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -32,96 +32,34 @@ logger = logging.getLogger(__name__)
 model_dir = path.join(path.dirname(path.realpath(__file__)), 'model')
 net_main = load_net(path.join(model_dir, 'model.cfg'), path.join(model_dir, 'model.meta'))
 
-def non_max_suppression(boxes, scores, threshold):
-    if len(boxes) == 0:
-        return []
-    
-    # Convert boxes to the format [x1, y1, x2, y2]
-    x1 = boxes[:, 0]
-    y1 = boxes[:, 1]
-    x2 = boxes[:, 0] + boxes[:, 2]
-    y2 = boxes[:, 1] + boxes[:, 3]
-
-    areas = (x2 - x1) * (y2 - y1)
-    order = scores.argsort()[::-1]
-
-    keep = []
-    while order.size > 0:
-        i = order[0]
-        keep.append(i)
-        xx1 = np.maximum(x1[i], x1[order[1:]])
-        yy1 = np.maximum(y1[i], y1[order[1:]])
-        xx2 = np.minimum(x2[i], x2[order[1:]])
-        yy2 = np.minimum(y2[i], y2[order[1:]])
-
-        w = np.maximum(0.0, xx2 - xx1)
-        h = np.maximum(0.0, yy2 - yy1)
-        inter = w * h
-        ovr = inter / (areas[i] + areas[order[1:]] - inter)
-
-        inds = np.where(ovr <= threshold)[0]
-        order = order[inds + 1]
-
-    return keep
-
 def draw_bounding_boxes(image, detections):
-    if not detections:
-        logger.warning("No detections to draw")
-        return image
-
-    logger.debug(f"Detections: {detections}")
-
-    try:
-        boxes = np.array([detection[2] for detection in detections])
-        scores = np.array([detection[1] for detection in detections])
-        
-        logger.debug(f"Boxes shape: {boxes.shape}, Scores shape: {scores.shape}")
-        
-        # Apply non-max suppression
-        keep = non_max_suppression(boxes, scores, NMS_THRESHOLD)
-        
-        for idx in keep:
-            label, confidence, bbox = detections[idx]
-            x, y, w, h = [int(v) for v in bbox]
-            color = (0, 255, 0)  # Green color for bounding box
-            cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
-            text = f"{label}: {confidence:.2f}"
-            cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-    except Exception as e:
-        logger.error(f"Error in draw_bounding_boxes: {e}")
-        
+    for detection in detections:
+        label, confidence, bbox = detection
+        x, y, w, h = [int(v) for v in bbox]
+        color = (0, 255, 0)  # Green color for bounding box
+        cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
+        text = f"{label}: {confidence:.2f}"
+        cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
     return image
 
-@app.route('/detect/', methods=['GET'])
-def get_detections():
+@app.route('/p/', methods=['GET'])
+def get_p():
     if 'img' in request.args:
         try:
-            resp = requests.get(request.args['img'], stream=True, timeout=(5.0, 5))
+            resp = requests.get(request.args['img'], stream=True, timeout=(0.1, 5))
             resp.raise_for_status()
             img_array = np.array(bytearray(resp.content), dtype=np.uint8)
             img = cv2.imdecode(img_array, -1)
-            
-            threshold = float(request.args.get('threshold', THRESH))
-            detections = detect(net_main, img, thresh=threshold)
-            
-            # Draw bounding boxes on the image
-            img_with_boxes = draw_bounding_boxes(img, detections)
-            
-            # Convert the image to bytes
-            is_success, buffer = cv2.imencode(".jpg", img_with_boxes)
-            if not is_success:
-                raise Exception("Failed to encode image")
-            
-            byte_io = io.BytesIO(buffer)
-            byte_io.seek(0)
-            
-            return send_file(byte_io, mimetype='image/jpeg')
-        
+            detections = detect(net_main, img, thresh=THRESH)
+            return jsonify({'detections': detections})
         except Exception as err:
-            app.logger.error(f"Failed to process image {request.args} - {err}")
+            app.logger.error(f"Failed to get image {request.args} - {err}")
             abort(
                 make_response(
-                    f"Failed to process image - {err}",
+                    jsonify(
+                        detections=[],
+                        message=f"Failed to get image {request.args} - {err}",
+                    ),
                     400,
                 )
             )
@@ -129,7 +67,9 @@ def get_detections():
         app.logger.warn(f"Invalid request params: {request.args}")
         abort(
             make_response(
-                f"Invalid request params: {request.args}",
+                jsonify(
+                    detections=[], message=f"Invalid request params: {request.args}"
+                ),
                 422,
             )
         )
@@ -137,6 +77,41 @@ def get_detections():
 @app.route('/hc/', methods=['GET'])
 def health_check():
     return 'ok' if net_main is not None else 'error'
+
+@app.route('/', methods=['GET'])
+def index():
+    return 'Hello from the Obico ML Addon!'
+
+@app.route('/detect/', methods=['POST'])
+def failure_detect():
+    data = request.get_json()
+
+    img_base64 = data.get("img", None)
+    if img_base64 is None:
+        return jsonify({"error": "No image provided"}), 400
+
+    try:
+        img_bytes = base64.b64decode(img_base64)
+        img_array = np.frombuffer(img_bytes, dtype=np.uint8)
+        img = cv2.imdecode(img_array, -1)
+
+        threshold = float(data.get("threshold", THRESH))
+
+        detections = detect(net_main, img, thresh=threshold)
+
+        img_with_boxes = draw_bounding_boxes(img, detections)
+
+        _, buffer = cv2.imencode('.jpg', img_with_boxes)
+        img_with_boxes_base64 = base64.b64encode(buffer).decode('utf-8')
+
+        return jsonify({
+            "detections": detections,
+            "image_with_detections": img_with_boxes_base64
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"Error processing image: {str(e)}")
+        return jsonify({"error": f"Failed to process image - {str(e)}"}), 500
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=3333, threaded=False)

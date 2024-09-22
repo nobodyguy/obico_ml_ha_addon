@@ -1,6 +1,6 @@
 name: Obico ML
 version: "1.0.0"
-slug: obico_ml_ha_addon
+slug: obico_ml
 description: "Home Assistant addon for integrating Obico ML-based monitoring."
 ports:
   3333/tcp: 3333
