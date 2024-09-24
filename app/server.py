@@ -36,10 +36,10 @@ def draw_bounding_boxes(image, detections):
     for detection in detections:
         label, confidence, bbox = detection
         x, y, w, h = [int(v) for v in bbox]
-        color = (0, 255, 0)  # Green color for bounding box
-        cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
+        color = (0, 0, 255)  # Red color for bounding box
+        cv2.rectangle(image, (x, y), (x + w, y + h), color, 5)
         text = f"{label}: {confidence:.2f}"
-        cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5, color, 2)
     return image
 
 @app.route('/p/', methods=['GET'])
