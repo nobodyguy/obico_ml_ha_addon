@@ -129,11 +129,31 @@ HEALTHCHECK \
     CMD curl --fail http://0.0.0.0:3333/hc || exit 1
 
 WORKDIR /app
-ADD ./app /app
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
 
-RUN echo 'Downloading the latest failure detection AI model in Darknet format...'
-RUN wget -O model/model-weights.darknet $(cat model/model-weights.darknet.url | tr -d '\r')
-RUN echo 'Downloading the latest failure detection AI model in ONNX format...'
-RUN wget -O model/model-weights.onnx $(cat model/model-weights.onnx.url | tr -d '\r')
+# Requirements and model URLs first, so a source edit does not invalidate
+# the pip layer or force a re-download of ~400MB of weights.
+COPY app/requirements.txt /app/
+COPY app/model/*.url app/model/*.sha256 /app/model/
+COPY app/scripts/fetch_verified.sh /usr/local/bin/fetch_verified
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
+
+# Same as upstream ml_api/Dockerfile: fetch each format only if this base
+# can load it, verified against the sha256 next to its URL.
+RUN mkdir -p /model_cache/ml_api/darknet /model_cache/ml_api/onnx \
+ && if [ -e /darknet/libdarknet_gpu.so ] || [ -e /darknet/libdarknet_cpu.so ]; then \
+      echo 'Downloading the latest failure detection AI model in Darknet format...'; \
+      fetch_verified "$(tr -d '\r' < model/model-weights.darknet.url)" /model_cache/ml_api/darknet/model-weights.darknet 50000000 \
+        "$(tr -d '\r' < model/model-weights.darknet.sha256)"; \
+    else \
+      echo 'No darknet library in this base; skipping its weights.'; \
+    fi \
+ && if python3 -c 'import onnxruntime' 2>/dev/null; then \
+      echo 'Downloading the latest failure detection AI model in ONNX format...'; \
+      fetch_verified "$(tr -d '\r' < model/model-weights.onnx.url)" /model_cache/ml_api/onnx/model-weights.onnx 50000000 \
+        "$(tr -d '\r' < model/model-weights.onnx.sha256)"; \
+    else \
+      echo 'No onnxruntime in this base; skipping its weights.'; \
+    fi
+
+ADD ./app /app

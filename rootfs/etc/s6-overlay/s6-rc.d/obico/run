@@ -6,6 +6,12 @@
 # ==============================================================================
 declare -a options
 
+if bashio::config.has_value 'ml_api_token'; then
+    bashio::log.info 'API token is set, requests to /p/ and /detect/ require authorization'
+    export ML_API_TOKEN="$(bashio::config 'ml_api_token')"
+fi
+
 bashio::log.info 'Starting Obico ML REST API server...'
 
-exec gunicorn --bind 0.0.0.0:3333 --chdir /app --limit-request-line 0 --workers 1 wsgi
+# --timeout because the model loads at import, inside worker boot
+exec gunicorn --bind 0.0.0.0:3333 --chdir /app --limit-request-line 0 --workers 1 --timeout 120 wsgi

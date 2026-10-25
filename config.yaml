@@ -1,5 +1,5 @@
 name: Obico ML
-version: "1.1.0"
+version: "1.2.0"
 slug: obico_ml
 description: "Home Assistant addon for integrating Obico ML-based monitoring."
 ports:
@@ -18,3 +18,6 @@ healthcheck:
   interval: 30s
   timeout: 10s
   retries: 3
+options: {}
+schema:
+  ml_api_token: "password?"

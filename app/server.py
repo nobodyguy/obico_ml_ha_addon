@@ -2,16 +2,16 @@
 
 import flask
 from flask_compress import Compress
-from flask import abort, make_response, request, send_file, jsonify
+from flask import abort, make_response, request, jsonify
 from os import path, environ
 import cv2
-import json
 import numpy as np
 import requests
-import io
-import logging
+import backoff
 import base64
+from requests.exceptions import HTTPError
 
+from auth import token_required
 from lib.detection_model import load_net, detect
 
 THRESH = 0.2  # The threshold for a box to be considered a positive detection
@@ -25,12 +25,9 @@ status = dict()
 # SECURITY WARNING: don't run with debug turned on in production!
 app.config['DEBUG'] = environ.get('DEBUG') == 'True'
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
 model_dir = path.join(path.dirname(path.realpath(__file__)), 'model')
 net_main = load_net(path.join(model_dir, 'model.cfg'), path.join(model_dir, 'model.meta'))
+
 
 def draw_bounding_boxes(image, detections):
     for detection in detections:
@@ -42,12 +39,41 @@ def draw_bounding_boxes(image, detections):
         cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5, color, 2)
     return image
 
+
+def _should_retry(exc):
+    """Retry on transient network errors and HTTP 5xx server errors."""
+    if isinstance(exc, (requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
+        return True
+    if isinstance(exc, HTTPError) and exc.response is not None:
+        return exc.response.status_code >= 500
+    return False
+
+
+@backoff.on_exception(
+    backoff.expo,
+    (HTTPError, requests.exceptions.Timeout, requests.exceptions.ConnectionError),
+    max_tries=3,
+    giveup=lambda exc: not _should_retry(exc)
+)
+def _get_with_retry(url, timeout, stream=True):
+    """Make HTTP GET request with retry logic for transient errors."""
+    resp = requests.get(url, stream=stream, timeout=timeout)
+    resp.raise_for_status()
+    return resp
+
+
 @app.route('/p/', methods=['GET'])
+@token_required
 def get_p():
     if 'img' in request.args:
         try:
-            resp = requests.get(request.args['img'], stream=True, timeout=(0.1, 5))
-            resp.raise_for_status()
+            # Use longer timeout for Google Cloud Storage as it's slower
+            if 'storage.googleapis.com' in request.args['img']:
+                timeout = (10, 30)  # 10s connection, 30s read
+            else:
+                timeout = (0.1, 5)  # 0.1s connection, 5s read
+
+            resp = _get_with_retry(request.args['img'], timeout, stream=True)
             img_array = np.array(bytearray(resp.content), dtype=np.uint8)
             img = cv2.imdecode(img_array, -1)
             detections = detect(net_main, img, thresh=THRESH)
@@ -74,6 +100,7 @@ def get_p():
             )
         )
 
+
 @app.route('/hc/', methods=['GET'])
 def health_check():
     return 'ok' if net_main is not None else 'error'
@@ -83,6 +110,7 @@ def index():
     return 'Hello from the Obico ML Addon!'
 
 @app.route('/detect/', methods=['POST'])
+@token_required
 def failure_detect():
     data = request.get_json()
 
